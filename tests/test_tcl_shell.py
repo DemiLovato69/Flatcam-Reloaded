@@ -1,7 +1,7 @@
 import sys
 import unittest
-from PyQt4 import QtGui
-from PyQt4.QtCore import QThread
+from qt_compat import QtGui
+from qt_compat.QtCore import QThread
 
 from FlatCAMApp import App
 from os import listdir
@@ -42,7 +42,7 @@ class TclShellTest(unittest.TestCase):
     def setUpClass(cls):
 
         cls.setup = True
-        cls.app = QtGui.QApplication(sys.argv)
+        cls.app = QtGui.QApplication.instance() or QtGui.QApplication(sys.argv)
 
         # Create App, keep app defaults (do not load
         # user-defined defaults).
@@ -57,9 +57,7 @@ class TclShellTest(unittest.TestCase):
     def tearDownClass(cls):
 
         cls.fc.tcl = None
-        cls.app.closeAllWindows()
-        del cls.fc
-        del cls.app
+        cls.fc.close()
         pass
 
     def test_set_get_units(self):

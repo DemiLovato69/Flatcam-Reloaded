@@ -17,7 +17,7 @@ import re
 import webbrowser
 import os
 import tkinter
-from PyQt4 import Qt, QtCore, QtGui
+from qt_compat import Qt, QtCore, QtGui
 import time  # Just used for debugging. Double check before removing.
 from xml.dom.minidom import parseString as parse_xml_string
 from contextlib import contextmanager
@@ -152,6 +152,7 @@ class App(QtCore.QObject):
         FlatCAMVersion.setup(self)
 
         App.log.info("FlatCAM Starting...")
+        self._closed = False
 
         ###################
         ### OS-specific ###
@@ -491,18 +492,20 @@ class App(QtCore.QObject):
         self.thr1.start()
 
         #### Check for updates ####
-        # Separate thread (Not worker)
-        App.log.info("Checking for updates in backgroud (this is version %s)." % str(self.version))
+        # Separate thread (Not worker). Skip this side effect for test-style
+        # construction that intentionally bypasses user defaults.
+        if user_defaults:
+            App.log.info("Checking for updates in backgroud (this is version %s)." % str(self.version))
 
-        self.worker2 = Worker(self, name="worker2")
-        self.thr2 = QtCore.QThread()
-        self.worker2.moveToThread(self.thr2)
-        self.connect(self.thr2, QtCore.SIGNAL("started()"), self.worker2.run)
-        self.connect(self.thr2, QtCore.SIGNAL("started()"),
-                     lambda: self.worker_task.emit({'fcn': self.version_check,
-                                                    'params': [],
-                                                    'worker_name': "worker2"}))
-        self.thr2.start()
+            self.worker2 = Worker(self, name="worker2")
+            self.thr2 = QtCore.QThread()
+            self.worker2.moveToThread(self.thr2)
+            self.connect(self.thr2, QtCore.SIGNAL("started()"), self.worker2.run)
+            self.connect(self.thr2, QtCore.SIGNAL("started()"),
+                         lambda: self.worker_task.emit({'fcn': self.version_check,
+                                                        'params': [],
+                                                        'worker_name': "worker2"}))
+            self.thr2.start()
 
         ### Signal handling ###
         ## Custom signals
@@ -637,6 +640,28 @@ class App(QtCore.QObject):
             post_gui(self)
 
         App.log.debug("END of constructor. Releasing control.")
+
+    def close(self):
+        if getattr(self, '_closed', True):
+            return
+        self._closed = True
+
+        try:
+            self.worker_task.disconnect()
+        except (TypeError, RuntimeError):
+            pass
+
+        for thread in [
+            getattr(self, 'thr1', None),
+            getattr(self, 'thr2', None),
+            getattr(getattr(self, 'plotcanvas', None), 'cache_thread', None)
+        ]:
+            if thread is not None and thread.isRunning():
+                thread.quit()
+                thread.wait(1000)
+
+    def __del__(self):
+        self.close()
 
     def init_tcl(self):
         if hasattr(self, 'tcl'):
@@ -790,7 +815,7 @@ class App(QtCore.QObject):
             raise unknownException
 
     def display_tcl_error(self, error, error_info=None):
-        """
+        r"""
         escape bracket [ with \  otherwise there is error
         "ERROR: missing close-bracket" instead of real error
         :param error: it may be text  or exception
@@ -927,7 +952,7 @@ class App(QtCore.QObject):
         """
 
         # Type of message in brackets at the begining of the message.
-        match = re.search("\[([^\]]+)\](.*)", msg)
+        match = re.search(r"\[([^\]]+)\](.*)", msg)
         if match:
             level = match.group(1)
             msg_ = match.group(2)
@@ -2079,8 +2104,8 @@ class App(QtCore.QObject):
 
             if gerber_obj.is_empty():
                 app_obj.inform.emit("[error] No geometry found in file: " + filename)
-                self.collection.set_active(gerber_obj.options["name"])
-                self.collection.delete_active()
+                app_obj.progress.emit(0)
+                raise IOError("No geometry found in file: " + filename)
 
             # Further parsing
             self.progress.emit(70)  # TODO: Note the mixture of self and app_obj used here
@@ -2151,8 +2176,8 @@ class App(QtCore.QObject):
 
             if excellon_obj.is_empty():
                 app_obj.inform.emit("[error] No geometry found in file: " + filename)
-                self.collection.set_active(excellon_obj.options["name"])
-                self.collection.delete_active()
+                self.progress.emit(0)
+                raise IOError("No geometry found in file: " + filename)
             #self.progress.emit(70)
 
         with self.proc_container.new("Opening Excellon."):

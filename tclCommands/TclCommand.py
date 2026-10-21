@@ -3,7 +3,7 @@ import re
 import FlatCAMApp
 import abc
 import collections
-from PyQt4 import QtCore
+from qt_compat import QtCore
 from contextlib import contextmanager
 from FlatCAMObj import FlatCAMGerber, FlatCAMExcellon, FlatCAMGeometry, FlatCAMCNCjob, FlatCAMObj
 

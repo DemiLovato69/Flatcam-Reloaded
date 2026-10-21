@@ -1,4 +1,4 @@
-from PyQt4 import QtGui
+from qt_compat import QtGui
 from GUIElements import RadioSet, EvalEntry, LengthEntry
 from FlatCAMTool import FlatCAMTool
 #from FlatCAMObj import FlatCAMGerber, FlatCAMExcellon

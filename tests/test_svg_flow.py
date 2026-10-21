@@ -1,6 +1,6 @@
 import sys
 import unittest
-from PyQt4 import QtGui
+from qt_compat import QtGui
 from FlatCAMApp import App
 from FlatCAMObj import FlatCAMGeometry, FlatCAMCNCjob
 from ObjectUI import GerberObjectUI, GeometryObjectUI
@@ -12,7 +12,7 @@ import tempfile
 class SVGFlowTestCase(unittest.TestCase):
 
     def setUp(self):
-        self.app = QtGui.QApplication(sys.argv)
+        self.app = QtGui.QApplication.instance() or QtGui.QApplication(sys.argv)
 
         # Create App, keep app defaults (do not load
         # user-defined defaults).
@@ -21,8 +21,8 @@ class SVGFlowTestCase(unittest.TestCase):
         self.filename = 'drawing.svg'
 
     def tearDown(self):
+        self.fc.close()
         del self.fc
-        del self.app
 
     def test_flow(self):
 

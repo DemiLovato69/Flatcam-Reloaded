@@ -5,7 +5,7 @@
 # Date: 2/5/2014                                           #
 # MIT Licence                                              #
 ############################################################
-from PyQt4 import QtGui, QtCore, Qt
+from qt_compat import QtGui, QtCore, Qt
 from GUIElements import *
 
 
@@ -239,7 +239,7 @@ class FlatCAMGUI(QtGui.QMainWindow):
         # right_widget.setContentsMargins(0, 0, 0, 0)
         self.splitter.addWidget(right_widget)
         self.right_layout = QtGui.QVBoxLayout()
-        self.right_layout.setMargin(0)
+        self.right_layout.setContentsMargins(0, 0, 0, 0)
         # self.right_layout.setContentsMargins(0, 0, 0, 0)
         right_widget.setLayout(self.right_layout)
 

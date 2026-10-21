@@ -1,5 +1,5 @@
 import unittest
-from PyQt4 import QtGui
+from qt_compat import QtGui
 import sys
 from FlatCAMApp import App
 from FlatCAMObj import FlatCAMExcellon, FlatCAMCNCjob
@@ -21,7 +21,7 @@ class ExcellonFlowTestCase(unittest.TestCase):
     filename = 'case1.drl'
 
     def setUp(self):
-        self.app = QtGui.QApplication(sys.argv)
+        self.app = QtGui.QApplication.instance() or QtGui.QApplication(sys.argv)
 
         # Create App, keep app defaults (do not load
         # user-defined defaults).
@@ -30,8 +30,8 @@ class ExcellonFlowTestCase(unittest.TestCase):
         self.fc.open_excellon('tests/excellon_files/' + self.filename)
 
     def tearDown(self):
+        self.fc.close()
         del self.fc
-        del self.app
 
     def test_flow(self):
         # Names of available objects.

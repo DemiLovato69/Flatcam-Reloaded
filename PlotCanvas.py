@@ -6,14 +6,14 @@
 # MIT Licence                                              #
 ############################################################
 
-from PyQt4 import QtGui, QtCore
+from qt_compat import QtGui, QtCore
 
 # Prevent conflict with Qt5 and above.
 from matplotlib import use as mpl_use
-mpl_use("Qt4Agg")
+mpl_use("qtagg")
 
 from matplotlib.figure import Figure
-from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 import FlatCAMApp
 import logging

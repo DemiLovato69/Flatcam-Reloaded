@@ -7,7 +7,7 @@
 ############################################################
 
 from FlatCAMGUI import FlatCAMActivityView
-from PyQt4 import QtCore
+from qt_compat import QtCore
 import weakref
 
 

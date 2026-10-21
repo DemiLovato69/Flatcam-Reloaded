@@ -1,5 +1,9 @@
 from shapely.geometry import LineString, Polygon
-from shapely.ops import cascaded_union, unary_union
+from shapely.ops import unary_union
+try:
+    from shapely.ops import cascaded_union
+except ImportError:
+    cascaded_union = unary_union
 from matplotlib.pyplot import plot, subplot, show
 from camlib import *
 

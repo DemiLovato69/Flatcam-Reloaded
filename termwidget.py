@@ -4,8 +4,8 @@ Shows intput and output text. Allows to enter commands. Supports history.
 """
 
 import html
-from PyQt4.QtCore import pyqtSignal, Qt
-from PyQt4.QtGui import QColor, QKeySequence, QLineEdit, QPalette, \
+from qt_compat.QtCore import pyqtSignal, Qt
+from qt_compat.QtGui import QColor, QKeySequence, QLineEdit, QPalette, \
                         QSizePolicy, QTextCursor, QTextEdit, \
                         QVBoxLayout, QWidget
 

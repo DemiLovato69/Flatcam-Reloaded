@@ -1,6 +1,6 @@
 import sys
 import unittest
-from PyQt4 import QtGui
+from qt_compat import QtGui
 from FlatCAMApp import App, tclCommands
 from FlatCAMObj import FlatCAMGerber, FlatCAMGeometry, FlatCAMCNCjob
 from ObjectUI import GerberObjectUI, GeometryObjectUI
@@ -21,7 +21,7 @@ class GerberFlowTestCase(unittest.TestCase):
     filename = 'simple1.gbr'
 
     def setUp(self):
-        self.app = QtGui.QApplication(sys.argv)
+        self.app = QtGui.QApplication.instance() or QtGui.QApplication(sys.argv)
 
         # Create App, keep app defaults (do not load
         # user-defined defaults).
@@ -30,8 +30,8 @@ class GerberFlowTestCase(unittest.TestCase):
         self.fc.open_gerber('tests/gerber_files/' + self.filename)
 
     def tearDown(self):
+        self.fc.close()
         del self.fc
-        del self.app
 
     def test_flow(self):
         # Names of available objects.
@@ -78,6 +78,11 @@ class GerberFlowTestCase(unittest.TestCase):
                              "Option '{}' == {} but form has {}".format(
                                  option, value, form_field.get_value()
                              ))
+
+        gerber_obj.options['plot'] = False
+        self.assertFalse(gerber_obj.ui.plot_cb.get_value())
+        gerber_obj.options['plot'] = True
+        self.assertTrue(gerber_obj.ui.plot_cb.get_value())
 
         #--------------------------------------------------
         # Changes in the GUI should be read in when
@@ -188,3 +193,21 @@ class GerberFlowTestCase(unittest.TestCase):
         os.remove(output_filename)
 
         print(names)
+
+
+class EmptyGerberTestCase(unittest.TestCase):
+
+    def setUp(self):
+        self.app = QtGui.QApplication.instance() or QtGui.QApplication(sys.argv)
+        self.fc = App(user_defaults=False)
+
+    def tearDown(self):
+        self.fc.close()
+        del self.fc
+
+    def test_empty_gerber_does_not_add_object(self):
+        with tempfile.NamedTemporaryFile(suffix='.gbr') as gerber_file:
+            with self.assertRaises(IOError):
+                self.fc.open_gerber(gerber_file.name)
+
+        self.assertEqual(self.fc.collection.get_names(), [])

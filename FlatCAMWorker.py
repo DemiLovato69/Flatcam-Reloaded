@@ -6,7 +6,8 @@
 # MIT Licence                                              #
 ############################################################
 
-from PyQt4 import QtCore
+from qt_compat import QtCore
+import traceback
 
 
 class Worker(QtCore.QObject):
@@ -58,8 +59,8 @@ class Worker(QtCore.QObject):
             try:
                 task['fcn'](*task['params'])
             except Exception as e:
+                self.app.log.error(traceback.format_exc())
                 self.app.thread_exception.emit(e)
-                raise e
 
             return
 

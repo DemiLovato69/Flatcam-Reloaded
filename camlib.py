@@ -10,7 +10,7 @@
 #import traceback
 
 from io import StringIO
-from numpy import arctan2, Inf, array, sqrt, pi, ceil, sin, cos, dot, float32, \
+from numpy import arctan2, inf as Inf, array, sqrt, pi, ceil, sin, cos, dot, float32, \
     transpose
 from numpy.linalg import solve, norm
 from matplotlib.figure import Figure
@@ -31,7 +31,11 @@ from rtree import index as rtindex
 from shapely.geometry import Polygon, LineString, Point, LinearRing
 from shapely.geometry import MultiPoint, MultiPolygon
 from shapely.geometry import box as shply_box
-from shapely.ops import cascaded_union, unary_union
+from shapely.ops import unary_union
+try:
+    from shapely.ops import cascaded_union
+except ImportError:
+    cascaded_union = unary_union
 import shapely.affinity as affinity
 from shapely.wkt import loads as sloads
 from shapely.wkt import dumps as sdumps
@@ -290,15 +294,19 @@ class Geometry(object):
         if geometry is None:
             geometry = self.solid_geometry
 
-        ## If iterable, expand recursively.
-        try:
-            for geo in geometry:
+        if hasattr(geometry, 'geoms'):
+            for geo in geometry.geoms:
                 exteriors.extend(self.get_exteriors(geometry=geo))
+        else:
+            ## If iterable, expand recursively.
+            try:
+                for geo in geometry:
+                    exteriors.extend(self.get_exteriors(geometry=geo))
 
-        ## Not iterable, get the exterior if polygon.
-        except TypeError:
-            if type(geometry) == Polygon:
-                exteriors.append(geometry.exterior)
+            ## Not iterable, get the exterior if polygon.
+            except TypeError:
+                if isinstance(geometry, Polygon):
+                    exteriors.append(geometry.exterior)
 
         return exteriors
 
@@ -320,22 +328,30 @@ class Geometry(object):
         if reset:
             self.flat_geometry = []
 
-        ## If iterable, expand recursively.
-        try:
-            for geo in geometry:
+        if hasattr(geometry, 'geoms'):
+            for geo in geometry.geoms:
                 self.flatten(geometry=geo,
                              reset=False,
                              pathonly=pathonly)
+        else:
+            ## If iterable, expand recursively.
+            try:
+                for geo in geometry:
+                    self.flatten(geometry=geo,
+                                 reset=False,
+                                 pathonly=pathonly)
 
-        ## Not iterable, do the actual indexing and add.
-        except TypeError:
-            if pathonly and type(geometry) == Polygon:
-                self.flat_geometry.append(geometry.exterior)
-                self.flatten(geometry=geometry.interiors,
-                             reset=False,
-                             pathonly=True)
-            else:
-                self.flat_geometry.append(geometry)
+            ## Not iterable, do the actual indexing and add.
+            except TypeError:
+                if pathonly and isinstance(geometry, Polygon):
+                    self.flat_geometry.append(geometry.exterior)
+                    self.flatten(geometry=geometry.interiors,
+                                 reset=False,
+                                 pathonly=True)
+                else:
+                    self.flat_geometry.append(geometry)
+
+            return self.flat_geometry
 
         return self.flat_geometry
 
@@ -505,6 +521,15 @@ class Geometry(object):
         geoms = FlatCAMRTreeStorage()
         geoms.get_points = get_pts
 
+        def insert_paths(geometry):
+            if hasattr(geometry, 'geoms'):
+                for geo in geometry.geoms:
+                    insert_paths(geo)
+                return
+            geoms.insert(geometry.exterior)
+            for interior in geometry.interiors:
+                geoms.insert(interior)
+
         # Can only result in a Polygon or MultiPolygon
         # NOTE: The resulting polygon can be "empty".
         current = polygon.buffer(-tooldia / 2.0)
@@ -513,18 +538,7 @@ class Geometry(object):
             # into the FlatCAMStorage will fail.
             return None
 
-        # current can be a MultiPolygon
-        try:
-            for p in current:
-                geoms.insert(p.exterior)
-                for i in p.interiors:
-                    geoms.insert(i)
-
-        # Not a Multipolygon. Must be a Polygon
-        except TypeError:
-            geoms.insert(current.exterior)
-            for i in current.interiors:
-                geoms.insert(i)
+        insert_paths(current)
 
         while True:
 
@@ -532,18 +546,7 @@ class Geometry(object):
             current = current.buffer(-tooldia * (1 - overlap))
             if current.area > 0:
 
-                # current can be a MultiPolygon
-                try:
-                    for p in current:
-                        geoms.insert(p.exterior)
-                        for i in p.interiors:
-                            geoms.insert(i)
-
-                # Not a Multipolygon. Must be a Polygon
-                except TypeError:
-                    geoms.insert(current.exterior)
-                    for i in current.interiors:
-                        geoms.insert(i)
+                insert_paths(current)
             else:
                 break
 
@@ -789,7 +792,7 @@ class Geometry(object):
                 # then reverse coordinates.
                 # but prefer the first one if last == first
                 if pt != candidate.coords[0] and pt == candidate.coords[-1]:
-                    candidate.coords = list(candidate.coords)[::-1]
+                    candidate = LineString(list(candidate.coords)[::-1])
 
                 # Straight line from current_pt to pt.
                 # Is the toolpath inside the geometry?
@@ -800,7 +803,7 @@ class Geometry(object):
                     #log.debug("Walk to path #%d is inside. Joining." % path_count)
 
                     # Completely inside. Append...
-                    geo.coords = list(geo.coords) + list(candidate.coords)
+                    geo = LineString(list(geo.coords) + list(candidate.coords))
                     # try:
                     #     last = optimized_paths[-1]
                     #     last.coords = list(last.coords) + list(geo.coords)
@@ -872,22 +875,22 @@ class Geometry(object):
                 if type(left) == LineString:
                     if left.coords[0] == geo.coords[0]:
                         storage.remove(left)
-                        geo.coords = list(geo.coords)[::-1] + list(left.coords)
+                        geo = LineString(list(geo.coords)[::-1] + list(left.coords))
                         continue
 
                     if left.coords[-1] == geo.coords[0]:
                         storage.remove(left)
-                        geo.coords = list(left.coords) + list(geo.coords)
+                        geo = LineString(list(left.coords) + list(geo.coords))
                         continue
 
                     if left.coords[0] == geo.coords[-1]:
                         storage.remove(left)
-                        geo.coords = list(geo.coords) + list(left.coords)
+                        geo = LineString(list(geo.coords) + list(left.coords))
                         continue
 
                     if left.coords[-1] == geo.coords[-1]:
                         storage.remove(left)
-                        geo.coords = list(geo.coords) + list(left.coords)[::-1]
+                        geo = LineString(list(geo.coords) + list(left.coords)[::-1])
                         continue
 
                 _, right = storage.nearest(geo.coords[-1])
@@ -898,22 +901,22 @@ class Geometry(object):
                 if type(right) == LineString:
                     if right.coords[0] == geo.coords[-1]:
                         storage.remove(right)
-                        geo.coords = list(geo.coords) + list(right.coords)
+                        geo = LineString(list(geo.coords) + list(right.coords))
                         continue
 
                     if right.coords[-1] == geo.coords[-1]:
                         storage.remove(right)
-                        geo.coords = list(geo.coords) + list(right.coords)[::-1]
+                        geo = LineString(list(geo.coords) + list(right.coords)[::-1])
                         continue
 
                     if right.coords[0] == geo.coords[0]:
                         storage.remove(right)
-                        geo.coords = list(geo.coords)[::-1] + list(right.coords)
+                        geo = LineString(list(geo.coords)[::-1] + list(right.coords))
                         continue
 
                     if right.coords[-1] == geo.coords[0]:
                         storage.remove(right)
-                        geo.coords = list(left.coords) + list(geo.coords)
+                        geo = LineString(list(right.coords) + list(geo.coords))
                         continue
 
                 # right is either a LinearRing or it does not connect
@@ -1607,7 +1610,7 @@ class Gerber (Geometry):
         # Optional start with G02 or G03, optional end with D01 or D02 with
         # optional coordinates but at least one in any order.
         self.circ_re = re.compile(r'^(?:G0?([23]))?(?=.*X([\+-]?\d+))?(?=.*Y([\+-]?\d+))' +
-                                  '?(?=.*I([\+-]?\d+))?(?=.*J([\+-]?\d+))?[XYIJ][^D]*(?:D0([12]))?\*$')
+                                  r'?(?=.*I([\+-]?\d+))?(?=.*J([\+-]?\d+))?[XYIJ][^D]*(?:D0([12]))?\*$')
 
         # G01/2/3 Occurring without coordinates
         self.interp_re = re.compile(r'^(?:G0?([123]))\*')
@@ -2300,7 +2303,7 @@ class Gerber (Geometry):
                     # so it can be processed by FlatCAM.
                     # But first test to see if the aperture type is "aperture macro". In that case
                     # we should not test for "size" key as it does not exist in this case.
-                    if self.apertures[current_aperture]["type"] is not "AM":
+                    if self.apertures[current_aperture]["type"] != "AM":
                         if self.apertures[current_aperture]["size"] == 0:
                             self.apertures[current_aperture]["size"] = 0.0000001
                     log.debug(self.apertures[current_aperture])
@@ -2420,18 +2423,18 @@ class Gerber (Geometry):
                 self.solid_geometry = poly_buffer
                 return
 
-            log.warn("Joining %d polygons." % len(poly_buffer))
+            log.warning("Joining %d polygons." % len(poly_buffer))
             if self.use_buffer_for_union:
                 log.debug("Union by buffer...")
                 new_poly = MultiPolygon(poly_buffer)
                 new_poly = new_poly.buffer(0.00000001)
                 new_poly = new_poly.buffer(-0.00000001)
-                log.warn("Union(buffer) done.")
+                log.warning("Union(buffer) done.")
             else:
                 log.debug("Union by union()...")
                 new_poly = cascaded_union(poly_buffer)
                 new_poly = new_poly.buffer(0)
-                log.warn("Union done.")
+                log.warning("Union done.")
             if current_polarity == 'D':
                 self.solid_geometry = self.solid_geometry.union(new_poly)
             else:
@@ -3254,6 +3257,10 @@ class CNCjob(Geometry):
         path_count = 0
         current_pt = (0, 0)
         pt, geo = storage.nearest(current_pt)
+
+        def reverse_path(path):
+            return type(path)(list(path.coords)[::-1])
+
         try:
             while True:
                 path_count += 1
@@ -3267,7 +3274,7 @@ class CNCjob(Geometry):
                 # but prefer the first one if last point == first point
                 # then reverse coordinates.
                 if pt != geo.coords[0] and pt == geo.coords[-1]:
-                    geo.coords = list(geo.coords)[::-1]
+                    geo = reverse_path(geo)
 
                 #---------- Single depth/pass --------
                 if not multidepth:
@@ -3323,13 +3330,13 @@ class CNCjob(Geometry):
                         # Reverse coordinates if not a loop so we can continue
                         # cutting without returning to the beginning.
                         if type(geo) == LineString:
-                            geo.coords = list(geo.coords)[::-1]
+                            geo = reverse_path(geo)
                             reverse = True
 
                     # If geometry is reversed, revert.
                     if reverse:
                         if type(geo) == LineString:
-                            geo.coords = list(geo.coords)[::-1]
+                            geo = reverse_path(geo)
 
                     # Lift the tool
                     self.gcode += "G00 Z%.4f\n" % self.z_move

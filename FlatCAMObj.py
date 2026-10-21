@@ -7,14 +7,16 @@
 ############################################################
 
 from io import StringIO
-from PyQt4 import QtCore
+from qt_compat import QtCore
 from copy import copy
 from ObjectUI import *
-import FlatCAMApp
 import inspect  # TODO: For debugging only.
 from camlib import *
 from FlatCAMCommon import LoudDict
 from FlatCAMDraw import FlatCAMDraw
+import logging
+
+log = logging.getLogger('base')
 
 
 ########################################
@@ -159,15 +161,15 @@ class FlatCAMObj(QtCore.QObject):
         """
 
         if self.axes is None:
-            FlatCAMApp.App.log.debug("setup_axes(): New axes")
+            log.debug("setup_axes(): New axes")
             self.axes = figure.add_axes([0.05, 0.05, 0.9, 0.9],
                                         label=self.options["name"])
         elif self.axes not in figure.axes:
-            FlatCAMApp.App.log.debug("setup_axes(): Clearing and attaching axes")
+            log.debug("setup_axes(): Clearing and attaching axes")
             self.axes.cla()
             figure.add_axes(self.axes)
         else:
-            FlatCAMApp.App.log.debug("setup_axes(): Clearing Axes")
+            log.debug("setup_axes(): Clearing Axes")
             self.axes.cla()
 
         # Remove all decoration. The app's axes will have
@@ -184,12 +186,12 @@ class FlatCAMObj(QtCore.QObject):
 
         :return: None
         """
-        FlatCAMApp.App.log.debug(str(inspect.stack()[1][3]) + "--> FlatCAMObj.to_form()")
+        log.debug(str(inspect.stack()[1][3]) + "--> FlatCAMObj.to_form()")
         for option in self.options:
             try:
                 self.set_form_item(option)
             except:
-                self.app.log.warning("Unexpected error:", sys.exc_info())
+                self.app.log.warning("Unexpected error: %s", sys.exc_info())
 
     def read_form(self):
         """
@@ -198,12 +200,12 @@ class FlatCAMObj(QtCore.QObject):
         :return: None
         :rtype: None
         """
-        FlatCAMApp.App.log.debug(str(inspect.stack()[1][3]) + "--> FlatCAMObj.read_form()")
+        log.debug(str(inspect.stack()[1][3]) + "--> FlatCAMObj.read_form()")
         for option in self.options:
             try:
                 self.read_form_item(option)
             except:
-                self.app.log.warning("Unexpected error:", sys.exc_info())
+                self.app.log.warning("Unexpected error: %s", sys.exc_info())
 
     def build_ui(self):
         """
@@ -215,7 +217,7 @@ class FlatCAMObj(QtCore.QObject):
         """
 
         self.muted_ui = True
-        FlatCAMApp.App.log.debug(str(inspect.stack()[1][3]) + "--> FlatCAMObj.build_ui()")
+        log.debug(str(inspect.stack()[1][3]) + "--> FlatCAMObj.build_ui()")
 
         # Remove anything else in the box
         # box_children = self.app.ui.notebook.selected_contents.get_children()
@@ -285,7 +287,7 @@ class FlatCAMObj(QtCore.QObject):
         :return: Whether to continue plotting or not depending on the "plot" option.
         :rtype: bool
         """
-        FlatCAMApp.App.log.debug(str(inspect.stack()[1][3]) + " --> FlatCAMObj.plot()")
+        log.debug(str(inspect.stack()[1][3]) + " --> FlatCAMObj.plot()")
 
         # Axes must exist and be attached to canvas.
         if self.axes is None or self.axes not in self.app.plotcanvas.figure.axes:
@@ -379,7 +381,7 @@ class FlatCAMGerber(FlatCAMObj, Gerber):
         """
         FlatCAMObj.set_ui(self, ui)
 
-        FlatCAMApp.App.log.debug("FlatCAMGerber.set_ui()")
+        log.debug("FlatCAMGerber.set_ui()")
 
         self.form_fields.update({
             "plot": self.ui.plot_cb,
@@ -539,12 +541,12 @@ class FlatCAMGerber(FlatCAMObj, Gerber):
             # to cut on the right side of the left over copper i.e on the left side of the features. 
             geom = self.isolation_geometry(offset)
             if invert:
-                if type(geom) is MultiPolygon:
+                if isinstance(geom, MultiPolygon):
                     pl = []
-                    for p in geom:
+                    for p in geom.geoms:
                         pl.append(Polygon(p.exterior.coords[::-1], p.interiors))
                     geom = MultiPolygon(pl)
-                elif type(geom) is Polygon:
+                elif isinstance(geom, Polygon):
                     geom = Polygon(geom.exterior.coords[::-1], geom.interiors)
                 else:
                     raise str("Unexpected Geometry")
@@ -625,7 +627,7 @@ class FlatCAMGerber(FlatCAMObj, Gerber):
 
     def plot(self):
 
-        FlatCAMApp.App.log.debug(str(inspect.stack()[1][3]) + " --> FlatCAMGerber.plot()")
+        log.debug(str(inspect.stack()[1][3]) + " --> FlatCAMGerber.plot()")
 
         # Does all the required setup and returns False
         # if the 'ptint' option is set to False.
@@ -656,8 +658,8 @@ class FlatCAMGerber(FlatCAMObj, Gerber):
                                          zorder=2)
                     self.axes.add_patch(patch)
                 except AssertionError:
-                    FlatCAMApp.App.log.warning("A geometry component was not a polygon:")
-                    FlatCAMApp.App.log.warning(str(poly))
+                    log.warning("A geometry component was not a polygon:")
+                    log.warning(str(poly))
         else:
             for poly in geometry:
                 x, y = poly.exterior.xy
@@ -748,7 +750,7 @@ class FlatCAMExcellon(FlatCAMObj, Excellon):
                         try:
                             exc_final.options[option] = exc.options[option]
                         except:
-                            exc.app.log.warning("Failed to copy option.",option)
+                            exc.app.log.warning("Failed to copy option: %s", option)
 
                 #deep copy of all drills,to avoid any references
                 for drill in exc.drills:
@@ -835,7 +837,7 @@ class FlatCAMExcellon(FlatCAMObj, Excellon):
         """
         FlatCAMObj.set_ui(self, ui)
 
-        FlatCAMApp.App.log.debug("FlatCAMExcellon.set_ui()")
+        log.debug("FlatCAMExcellon.set_ui()")
 
         self.form_fields.update({
             "plot": self.ui.plot_cb,
@@ -1057,7 +1059,7 @@ class FlatCAMCNCjob(FlatCAMObj, CNCjob):
                  feedrate=3.0, z_cut=-0.002, tooldia=0.0,
                  spindlespeed=None):
 
-        FlatCAMApp.App.log.debug("Creating CNCJob object...")
+        log.debug("Creating CNCJob object...")
 
         CNCjob.__init__(self, units=units, kind=kind, z_move=z_move,
                         feedrate=feedrate, z_cut=z_cut, tooldia=tooldia,
@@ -1084,7 +1086,7 @@ class FlatCAMCNCjob(FlatCAMObj, CNCjob):
     def set_ui(self, ui):
         FlatCAMObj.set_ui(self, ui)
 
-        FlatCAMApp.App.log.debug("FlatCAMCNCJob.set_ui()")
+        log.debug("FlatCAMCNCJob.set_ui()")
 
         assert isinstance(self.ui, CNCObjectUI), \
             "Expected a CNCObjectUI, got %s" % type(self.ui)
@@ -1160,7 +1162,7 @@ class FlatCAMCNCjob(FlatCAMObj, CNCjob):
 
             yield line
 
-        raise StopIteration
+        return
 
     def export_gcode(self, filename, preamble='', postamble='', processor=''):
 
@@ -1210,7 +1212,7 @@ class FlatCAMCNCjob(FlatCAMObj, CNCjob):
 
     def convert_units(self, units):
         factor = CNCjob.convert_units(self, units)
-        FlatCAMApp.App.log.debug("FlatCAMCNCjob.convert_units()")
+        log.debug("FlatCAMCNCjob.convert_units()")
         self.options["tooldia"] *= factor
 
 
@@ -1290,7 +1292,7 @@ class FlatCAMGeometry(FlatCAMObj, Geometry):
     def set_ui(self, ui):
         FlatCAMObj.set_ui(self, ui)
 
-        FlatCAMApp.App.log.debug("FlatCAMGeometry.set_ui()")
+        log.debug("FlatCAMGeometry.set_ui()")
 
         assert isinstance(self.ui, GeometryObjectUI), \
             "Expected a GeometryObjectUI, got %s" % type(self.ui)
@@ -1454,7 +1456,7 @@ class FlatCAMGeometry(FlatCAMObj, Geometry):
                 if isinstance(geo, Polygon):
                     yield geo
 
-            raise StopIteration
+            return
 
         # Initializes the new geometry object
         def gen_paintarea(geo_obj, app_obj):
@@ -1681,7 +1683,7 @@ class FlatCAMGeometry(FlatCAMObj, Geometry):
                 self.axes.plot(x, y, 'r-')
                 return
 
-            FlatCAMApp.App.log.warning("Did not plot:" + str(type(element)))
+            log.warning("Did not plot:" + str(type(element)))
 
     def plot(self):
         """

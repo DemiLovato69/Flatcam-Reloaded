@@ -1,5 +1,5 @@
 import sys
-from PyQt4 import QtGui, QtCore
+from qt_compat import QtGui, QtCore
 #from GUIElements import *
 from GUIElements import FCEntry, FloatEntry, EvalEntry, FCCheckBox, \
     LengthEntry, FCTextArea, IntEntry, RadioSet, OptionalInputSection

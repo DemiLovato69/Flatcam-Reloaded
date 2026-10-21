@@ -6,10 +6,11 @@
 # MIT Licence                                              #
 ############################################################
 
-from FlatCAMObj import *
 import inspect  # TODO: Remove
+import re
 import FlatCAMApp
-from PyQt4 import Qt, QtGui, QtCore
+from qt_compat import Qt, QtGui, QtCore
+from numpy import inf as Inf
 
 
 class KeySensitiveListView(QtGui.QListView):
@@ -29,13 +30,6 @@ class ObjectCollection():
     """
     Object storage and management.
     """
-
-    classdict = {
-        "gerber": FlatCAMGerber,
-        "excellon": FlatCAMExcellon,
-        "cncjob": FlatCAMCNCjob,
-        "geometry": FlatCAMGeometry
-    }
 
     icon_files = {
         "gerber": "share:flatcam_icon16.png",
@@ -169,9 +163,9 @@ class ObjectCollection():
         # The item is checkable, to add the checkbox.
         item.setCheckable(True)
         if obj.options["plot"] is True:
-            item.setCheckState(2)   #Qt.Checked)
+            item.setCheckState(QtCore.Qt.Checked)
         else:
-            item.setCheckState(0)   #Qt.Unchecked)
+            item.setCheckState(QtCore.Qt.Unchecked)
 
         self.model.appendRow(item)
 
@@ -184,15 +178,17 @@ class ObjectCollection():
         if key == "plot":
             self.model.blockSignals(True)
             name = obj.options["name"]
-            state = 0 #Qt.Unchecked
+            state = QtCore.Qt.Unchecked
+            checked = False
             for index in range(self.model.rowCount()):
                 item = self.model.item(index)
                 if self.object_list[item.row()].options["name"] == name:
                     if obj.options["plot"] == True:
-                        state = 2 #Qt.Checked
+                        state = QtCore.Qt.Checked
+                        checked = True
 
                     item.setCheckState(state)
-                    obj.ui.plot_cb.set_value(state)
+                    obj.ui.plot_cb.set_value(checked)
                     break
             self.model.blockSignals(False)
 
@@ -292,7 +288,11 @@ class ObjectCollection():
         :param name: Name of the FlatCAM Object
         :return: None
         """
-        iobj = self.model.createIndex(self.get_names().index(name), 0)  # Column 0
+        names = self.get_names()
+        if name not in names:
+            FlatCAMApp.App.log.warning("set_active(): Object named %s is not in the collection." % name)
+            return
+        iobj = self.model.createIndex(names.index(name), 0)  # Column 0
         self.view.selectionModel().select(iobj, QtGui.QItemSelectionModel.Select)
 
     def set_inactive(self, name):
@@ -303,7 +303,11 @@ class ObjectCollection():
         :param name: Name of the FlatCAM Object
         :return: None
         """
-        iobj = self.model.createIndex(self.get_names().index(name), 0)  # Column 0
+        names = self.get_names()
+        if name not in names:
+            FlatCAMApp.App.log.warning("set_inactive(): Object named %s is not in the collection." % name)
+            return
+        iobj = self.model.createIndex(names.index(name), 0)  # Column 0
         self.view.selectionModel().select(iobj, QtGui.QItemSelectionModel.Deselect)
 
     def set_all_inactive(self):
@@ -359,4 +363,3 @@ class ObjectCollection():
 
     def get_list(self):
         return self.object_list
-

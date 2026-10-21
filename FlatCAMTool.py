@@ -6,7 +6,7 @@
 # MIT Licence                                              #
 ############################################################
 
-from PyQt4 import QtGui
+from qt_compat import QtGui
 
 
 class FlatCAMTool(QtGui.QWidget):

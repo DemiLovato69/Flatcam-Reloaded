@@ -1,4 +1,4 @@
-from PyQt4 import QtGui, QtCore
+from qt_compat import QtGui, QtCore
 from copy import copy
 #import FlatCAMApp
 import re
@@ -404,4 +404,3 @@ class OptionalInputSection:
 
             for widget in self.optinputs:
                 widget.setEnabled(False)
-

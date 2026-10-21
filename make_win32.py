@@ -50,7 +50,7 @@ if sys.platform == "win32":
 
 buildOptions = dict(
     include_files=include_files,
-    # excludes=['PyQt4', 'tk', 'tcl']
+    # excludes=['tk', 'tcl']
     excludes=['scipy.lib.lapack.flapack.pyd',
               'scipy.lib.blas.fblas.pyd',
               'QtOpenGL4.dll']

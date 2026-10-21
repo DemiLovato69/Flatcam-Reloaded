@@ -1,5 +1,5 @@
-from PyQt4 import QtGui, QtCore
-from PyQt4 import Qt
+from qt_compat import QtGui, QtCore
+from qt_compat import Qt
 from GUIElements import FCEntry, FCButton
 from FlatCAMTool import FlatCAMTool
 from camlib import *

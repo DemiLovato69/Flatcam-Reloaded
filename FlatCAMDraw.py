@@ -6,8 +6,7 @@
 # MIT Licence                                              #
 ############################################################
 
-from PyQt4 import QtGui, QtCore, Qt
-import FlatCAMApp
+from qt_compat import QtGui, QtCore, Qt
 from camlib import *
 from FlatCAMTool import FlatCAMTool
 from ObjectUI import LengthEntry, RadioSet
@@ -15,13 +14,17 @@ from ObjectUI import LengthEntry, RadioSet
 from shapely.geometry import Polygon, LineString, Point, LinearRing
 from shapely.geometry import MultiPoint, MultiPolygon
 from shapely.geometry import box as shply_box
-from shapely.ops import cascaded_union, unary_union
+from shapely.ops import unary_union
+try:
+    from shapely.ops import cascaded_union
+except ImportError:
+    cascaded_union = unary_union
 import shapely.affinity as affinity
 from shapely.wkt import loads as sloads
 from shapely.wkt import dumps as sdumps
 from shapely.geometry.base import BaseGeometry
 
-from numpy import arctan2, Inf, array, sqrt, pi, ceil, sin, cos, sign, dot
+from numpy import arctan2, inf as Inf, array, sqrt, pi, ceil, sin, cos, sign, dot
 from numpy.linalg import solve
 
 #from mpl_toolkits.axes_grid.anchored_artists import AnchoredDrawingArea
@@ -682,9 +685,6 @@ class FCCopy(FCMove):
 ########################
 class FlatCAMDraw(QtCore.QObject):
     def __init__(self, app, disabled=False):
-        assert isinstance(app, FlatCAMApp.App), \
-            "Expected the app to be a FlatCAMApp.App, got %s" % type(app)
-
         super(FlatCAMDraw, self).__init__()
 
         self.app = app
@@ -1508,7 +1508,7 @@ class FlatCAMDraw(QtCore.QObject):
                 if isinstance(geo, Polygon):
                     yield geo
 
-            raise StopIteration
+            return
 
         for geo in selected:
 
