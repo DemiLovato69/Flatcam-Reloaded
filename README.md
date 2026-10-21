@@ -1,6 +1,11 @@
 FlatCAM: 2D Computer-Aided PCB Manufacturing
 ============================================
 
+# Reloaded
+This repo is a modified version of the original repo that can be found [here](https://bitbucket.org/jpcgt/flatcam/src/master/)
+I have taken the time to update and port it to modern Qt as well as fix many bugs. It seems the original project is dead so therefore 
+this would probably be the latest available release.
+
 (c) 2014-2016 Juan Pablo Caram
 
 FlatCAM is a program for preparing CNC jobs for making PCBs on a CNC router.
