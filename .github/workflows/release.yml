@@ -1,0 +1,87 @@
+name: Build and release
+
+on:
+  pull_request:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            platform: macos-arm64
+            executable: dist/FlatCAM.app/Contents/MacOS/FlatCAM
+            archive: FlatCAM-macos-arm64.zip
+          - os: ubuntu-22.04
+            platform: linux-x86_64
+            executable: dist/FlatCAM/FlatCAM
+            archive: FlatCAM-linux-x86_64.tar.gz
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Linux GUI libraries
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libxcb-cursor0 libxkbcommon-x11-0 libgl1 libegl1 libdbus-1-3 libfontconfig1 xvfb
+      - name: Install build dependencies
+        run: python -m pip install -r requirements.txt pyinstaller
+      - name: Build application
+        run: python -m PyInstaller --noconfirm --clean FlatCAM.spec
+      - name: Check bundled startup on macOS
+        if: runner.os == 'macOS'
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python tests/smoke_release.py "${{ matrix.executable }}"
+      - name: Check bundled startup on Linux
+        if: runner.os == 'Linux'
+        run: xvfb-run -a python tests/smoke_release.py "${{ matrix.executable }}"
+      - name: Package macOS app
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p release
+          ditto -c -k --sequesterRsrc --keepParent dist/FlatCAM.app "release/${{ matrix.archive }}"
+      - name: Package Linux app
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p release
+          tar -czf "release/${{ matrix.archive }}" -C dist FlatCAM
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform }}
+          path: release/${{ matrix.archive }}
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: '*'
+          path: release
+          merge-multiple: true
+      - name: Publish both builds
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          test -f release/FlatCAM-macos-arm64.zip
+          test -f release/FlatCAM-linux-x86_64.tar.gz
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" release/* --clobber
+          else
+            gh release create "$TAG" release/* --generate-notes --verify-tag
+          fi

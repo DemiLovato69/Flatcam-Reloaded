@@ -1,33 +1,29 @@
-# -*- mode: python -*-
+# -*- mode: python ; coding: utf-8 -*-
 
-block_cipher = None
+from pathlib import Path
+import sys
 
 
-a = Analysis(['FlatCAM.py'],
-             pathex=['/home/jpcaram/flatcam'],
-             binaries=None,
-             datas=[('share/*', 'share')],
-             hiddenimports=[],
-             hookspath=[],
-             runtime_hooks=[],
-             excludes=[],
-             win_no_prefer_redirects=False,
-             win_private_assemblies=False,
-             cipher=block_cipher)
-pyz = PYZ(a.pure, a.zipped_data,
-             cipher=block_cipher)
-exe = EXE(pyz,
-          a.scripts,
-          exclude_binaries=True,
-          name='FlatCAM',
-          debug=False,
-          strip=False,
-          upx=True,
-          console=True )
-coll = COLLECT(exe,
-               a.binaries,
-               a.zipfiles,
-               a.datas,
-               strip=False,
-               upx=True,
-               name='FlatCAM')
+root = Path(SPECPATH).resolve()
+
+a = Analysis(
+    [str(root / 'flatcam')],
+    pathex=[str(root)],
+    binaries=[],
+    datas=[
+        (str(root / 'share'), 'share'),
+        (str(root / 'LICENSE'), '.'),
+        (str(root / 'README.md'), '.'),
+    ],
+    hiddenimports=[],
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=[],
+)
+pyz = PYZ(a.pure)
+exe = EXE(pyz, a.scripts, [], exclude_binaries=True, name='FlatCAM', console=False)
+coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name='FlatCAM')
+
+if sys.platform == 'darwin':
+    app = BUNDLE(coll, name='FlatCAM.app', bundle_identifier='org.flatcam.flatcam')
